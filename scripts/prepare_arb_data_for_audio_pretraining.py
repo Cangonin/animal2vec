@@ -20,9 +20,7 @@ from pathlib import Path
 from datetime import timedelta, datetime
 import multiprocessing
 from functools import partial
-from concurrent.futures import ThreadPoolExecutor, as_completed
-
-
+from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
 # Define a custom argument type for a list of strings
 def list_of_strings(arg):
     return arg.split(',')
@@ -308,25 +306,24 @@ def main(args):
     # Remove duplicates
     files = list(set(files))
     num_threads = min(int(multiprocessing.cpu_count() / 2), len(files))
-
     # Using ThreadPoolExecutor
     partial_iteration = partial(iteration, args=args, id_generator=id_generator,
                                 labels=labels, channel_dict=channel_dict)
-
+    total_duration = 0
+    tot_num_files = 0
+    random_names_dicts = []
     with tqdm(total=len(files)) as pbar:
+        # Streamed execution to prevent memory overload
         with ThreadPoolExecutor(max_workers=num_threads) as executor:
-            futures = [executor.submit(partial_iteration, data) for data in files]
-
-            results = []
-            for future in as_completed(futures):
-                result = future.result()  # Get the result (optional)
-                results.append(result)
-                pbar.update(1)  # Update the progress bar
-
-    total_duration = sum([x[0] for x in results])
-    c_ = sum([x[1] for x in results])
-    random_names_dictionary = [x[2] for x in results]
-    random_names_dictionary = {k: v for d in random_names_dictionary for k, v in d.items()}
+            for total_dur, c_, rand_dict in tqdm(
+                    executor.map(partial_iteration, files),
+                    total=len(files)):
+        
+                total_duration += sum(total_dur)
+                tot_num_files += c_
+                random_names_dicts.append(rand_dict)
+                pbar.update(1)
+    random_names_dictionary = {k: v for d in random_names_dicts for k, v in d.items()}
 
     print("We iterated over {} files".format(c_), flush=True)
     if args.randomize_file_names:
