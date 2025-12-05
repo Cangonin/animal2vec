@@ -320,7 +320,7 @@ def main(args):
                     total=len(files)):
         
                 total_duration += sum(total_dur)
-                tot_num_files += c_
+                tot_num_files += sum(c_)
                 random_names_dicts.append(rand_dict)
                 pbar.update(1)
     random_names_dictionary = {k: v for d in random_names_dicts for k, v in d.items()}
